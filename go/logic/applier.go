@@ -18,7 +18,14 @@ import (
 
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
+
+    "sync"
 )
+
+var onlyOnce1 sync.Once
+var onlyOnce2 sync.Once
+var onlyOnce3 sync.Once
+var onlyOnce4 sync.Once
 
 const (
 	atomicCutOverMagicHint = "ghost-cut-over-sentry"
@@ -370,6 +377,7 @@ func (this *Applier) ReadMigrationMinValues(uniqueKey *sql.UniqueKey) error {
 			return err
 		}
 	}
+    log.Curious("Min Query SQL: %s", query)
 	log.Infof("Migration min values: [%s]", this.migrationContext.MigrationRangeMinValues)
 	return err
 }
@@ -391,6 +399,7 @@ func (this *Applier) ReadMigrationMaxValues(uniqueKey *sql.UniqueKey) error {
 			return err
 		}
 	}
+    log.Curious("Max Query SQL: %s", query)
 	log.Infof("Migration max values: [%s]", this.migrationContext.MigrationRangeMaxValues)
 	return err
 }
@@ -472,6 +481,10 @@ func (this *Applier) ApplyIterationInsertQuery() (chunkSize int64, rowsAffected 
 		this.migrationContext.GetIteration() == 0,
 		this.migrationContext.IsTransactionalTable(),
 	)
+
+    onlyOnce1.Do(func() {
+        log.Curious("Row copy insert query: %s", query)
+    })
 	if err != nil {
 		return chunkSize, rowsAffected, duration, err
 	}
@@ -954,11 +967,18 @@ func (this *Applier) buildDMLEventQuery(dmlEvent *binlog.BinlogDMLEvent) (result
 	case binlog.DeleteDML:
 		{
 			query, uniqueKeyArgs, err := sql.BuildDMLDeleteQuery(dmlEvent.DatabaseName, this.migrationContext.GetGhostTableName(), this.migrationContext.OriginalTableColumns, &this.migrationContext.UniqueKey.Columns, dmlEvent.WhereColumnValues.AbstractValues())
+            onlyOnce2.Do(func() {
+                log.Curious("Delete DML for events backlog: %s", query)
+            })
 			return append(results, newDmlBuildResult(query, uniqueKeyArgs, -1, err))
 		}
 	case binlog.InsertDML:
 		{
 			query, sharedArgs, err := sql.BuildDMLInsertQuery(dmlEvent.DatabaseName, this.migrationContext.GetGhostTableName(), this.migrationContext.OriginalTableColumns, this.migrationContext.SharedColumns, this.migrationContext.MappedSharedColumns, dmlEvent.NewColumnValues.AbstractValues())
+
+            onlyOnce3.Do(func() {
+                log.Curious("Insert DML for events backlog: %s", query)
+            })
 			return append(results, newDmlBuildResult(query, sharedArgs, 1, err))
 		}
 	case binlog.UpdateDML:
@@ -971,6 +991,9 @@ func (this *Applier) buildDMLEventQuery(dmlEvent *binlog.BinlogDMLEvent) (result
 				return results
 			}
 			query, sharedArgs, uniqueKeyArgs, err := sql.BuildDMLUpdateQuery(dmlEvent.DatabaseName, this.migrationContext.GetGhostTableName(), this.migrationContext.OriginalTableColumns, this.migrationContext.SharedColumns, this.migrationContext.MappedSharedColumns, &this.migrationContext.UniqueKey.Columns, dmlEvent.NewColumnValues.AbstractValues(), dmlEvent.WhereColumnValues.AbstractValues())
+            onlyOnce4.Do(func() {
+                log.Curious("Update DML for events backlog: %s", query)
+            })
 			args := sqlutils.Args()
 			args = append(args, sharedArgs...)
 			args = append(args, uniqueKeyArgs...)

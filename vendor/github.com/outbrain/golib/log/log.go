@@ -40,6 +40,8 @@ func (this LogLevel) String() string {
 		return "WARNING"
 	case NOTICE:
 		return "NOTICE"
+	case CURIOUS:
+		return "CURIOUS"
 	case INFO:
 		return "INFO"
 	case DEBUG:
@@ -60,8 +62,8 @@ func LogLevelFromString(logLevelName string) (LogLevel, error) {
 		return WARNING, nil
 	case "NOTICE":
 		return NOTICE, nil
-	case "INFO":
-		return INFO, nil
+	case "CURIOUS":
+		return CURIOUS, nil
 	case "DEBUG":
 		return DEBUG, nil
 	}
@@ -75,6 +77,7 @@ const (
 	WARNING
 	NOTICE
 	INFO
+    CURIOUS
 	DEBUG
 )
 
@@ -148,6 +151,8 @@ func logFormattedEntry(logLevel LogLevel, message string, args ...interface{}) s
 				return syslogWriter.Notice(msgArgs)
 			case INFO:
 				return syslogWriter.Info(msgArgs)
+			case CURIOUS:
+				return syslogWriter.Info(msgArgs)
 			case DEBUG:
 				return syslogWriter.Debug(msgArgs)
 			}
@@ -178,6 +183,10 @@ func logErrorEntry(logLevel LogLevel, err error) error {
 		debug.PrintStack()
 	}
 	return err
+}
+
+func Curious(message string, args ...interface{}) string {
+    return logFormattedEntry(CURIOUS, message, args...)
 }
 
 func Debug(message string, args ...interface{}) string {
